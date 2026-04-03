@@ -1,5 +1,6 @@
 
 import math
+import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -70,7 +71,10 @@ class PlotGrid:
         self.n_rows = math.ceil(num_plots / self.n_cols)
         figsize = (self.cell_size[0]*self.n_cols, self.cell_size[1]*self.n_rows)
         self.fig, self.axes = plt.subplots(self.n_rows, self.n_cols, figsize=figsize)
-        self.axes = self.axes.flatten()
+        if isinstance(self.axes, np.ndarray):
+            self.axes = self.axes.flatten()
+        else:
+            self.axes = [self.axes]
         self.current_index = 0
     
     def __get_next_axis(self):
@@ -411,3 +415,45 @@ class TimeSeriesPlot(PlotInterface):
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
+
+class KDEComparisonPlot(PlotInterface):
+    """A KDE plot comparing the distributions of a value across two categories, with mean and IQR lines."""
+
+    def __init__(self, data_segment, data_remaining, title, x_label=None, color_segment='#ff7f0e', color_remaining='#777777', alpha=0.5, figsize=DEFAULT_FIGSIZE):
+        """Initialize the KDE comparison plot.
+
+        Args:
+            data_segment (array-like): The data for the first category.
+            data_remaining (array-like): The data for the second category.
+            title (str): The title of the plot.
+            x_label (str): Label for the x-axis.
+            color_segment (str): Color for the first category.
+            color_remaining (str): Color for the second category.
+            alpha (float): Transparency level for the KDE plots.
+            figsize (tuple): Size of the figure.
+        """
+        super().__init__(title, figsize)
+        self.data_segment = data_segment
+        self.data_remaining = data_remaining
+        self.x_label = x_label
+        self.color_segment = color_segment
+        self.color_remaining = color_remaining
+        self.alpha = alpha
+    
+    def __plot_kde(self, data, color_shape, color_mean, label):
+        """Helper function to plot a KDE with mean and IQR lines."""
+        sns.kdeplot(data, fill=True, color=color_shape, ax=self.ax, label=label, alpha=self.alpha)
+        mean_val = data.mean()
+        self.ax.axvline(mean_val, color=color_mean, linestyle='-', linewidth=1.5, label=f'Mean: {mean_val:.2f}')
+        # IQR lines are commented out for now to reduce clutter, but can be re-enabled if desired
+        #q1 = data.quantile(0.25)
+        #q3 = data.quantile(0.75)
+        #self.ax.axvline(q1, color=color, linestyle='--', linewidth=1, label=f'Q1: {q1:.2f}')
+        #self.ax.axvline(q3, color=color, linestyle='--', linewidth=1, label=f'Q3: {q3:.2f}')
+    
+    def _plot(self):
+        """Plot the KDE comparison on the given axis."""
+        self.__plot_kde(self.data_remaining, self.color_remaining, 'black', label='Remaining')
+        self.__plot_kde(self.data_segment, self.color_segment, 'red', label='Segment')
+        self.ax.set_xlabel(self.x_label)
+        self.ax.legend()
