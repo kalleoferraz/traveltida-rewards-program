@@ -7,8 +7,21 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 from typing import List
 
+DEFAULT_FIGSIZE = (5,4)
+
 class PlotInterface:
     """Interface for plot classes that can be plotted on a matplotlib axis, wrapped by a PlotGrid."""
+
+    def __init__(self, title, figsize=DEFAULT_FIGSIZE):
+        """Initialize the plot. Subclasses should call this in their __init__ method.
+
+        Args:
+            title (str): The title of the plot.
+            figsize (tuple): Size of the figure.
+        """
+        self.title = title
+        self.figsize = figsize
+        self.ax = None
 
     def plot(self, ax=None):
         """Plot the visualization on the given axis.
@@ -16,12 +29,27 @@ class PlotInterface:
         Args:
             ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
         """
+        is_ax_set = ax is not None
+        if is_ax_set:
+            self.ax = ax
+        else:
+            self.fig, self.ax = plt.subplots(figsize=self.figsize)  # Get current axis if not provided
+
+        self.ax.set_title(self.title, fontsize=11)
+        self._plot()  # Call the subclass's implementation of the actual plotting logic
+
+        if not is_ax_set:
+            plt.show()
+    
+    def _plot(self):
+        """The actual plotting logic to be implemented by subclasses."""
         pass
+
 
 class PlotGrid:
     """A grid layout for plotting multiple plots in a single figure."""
 
-    def __init__(self, n_cols, cell_size=(5, 4)):
+    def __init__(self, n_cols, cell_size=DEFAULT_FIGSIZE):
         """Initialize the plot grid.
 
         Args:
@@ -102,67 +130,57 @@ class PlotGrid:
 class Histogram(PlotInterface):
     """A histogram plot with mean, median, mode lines and normal curve overlay."""
 
-    def __init__(self, data, title, x_label=""):
+    def __init__(self, data, title, x_label="", bins=30, figsize=DEFAULT_FIGSIZE):
         """Initialize the histogram.
 
         Args:
             data (array-like): The data to plot.
             title (str): The title of the plot.
             x_label (str): The label for the x-axis.
+            figsize (tuple): Size of the figure.
         """
+        super().__init__(title, figsize)
         self.data = data
-        self.title = title
         self.xlabel = x_label
-    
-    def plot(self, ax = None):
-        """Plot the histogram on the given axis.
+        self.bins = bins
 
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        num_bins = 30
+    def _plot(self):
+        """Plot the histogram on the given axis."""
         mean_val = self.data.mean()
         median_val = self.data.median()
         modes = self.data.mode()
         mode_val = modes if not modes.empty else []
 
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(5, 4))
-
         # Plot histogram
-        ax.hist(self.data, bins=num_bins, alpha=0.7, density=True) # Use density=True for normal curve overlay
-        ax.set_title(self.title, fontsize=11)
-        ax.set_xlabel(self.xlabel, fontsize=9)
-        ax.set_ylabel('Density', fontsize=9)
+        self.ax.hist(self.data, bins=self.bins, alpha=0.7, density=True) # Use density=True for normal curve overlay
+        self.ax.set_xlabel(self.xlabel, fontsize=9)
+        self.ax.set_ylabel('Density', fontsize=9)
 
         # Plot mean, median, mode lines
         max_modes = 7
         for mode in mode_val:
-            ax.axvline(mode, color='lightgray', linestyle='dashed', linewidth=2, label=f'Mode: {mode:.2f}')
+            self.ax.axvline(mode, color='lightgray', linestyle='dashed', linewidth=2, label=f'Mode: {mode:.2f}')
             max_modes -= 1
             if max_modes == 0:
                 break
         
         if mean_val is not None:
-            ax.axvline(mean_val, color='red', linestyle='solid', linewidth=2, label=f'Mean: {mean_val:.2f}')
+            self.ax.axvline(mean_val, color='red', linestyle='solid', linewidth=2, label=f'Mean: {mean_val:.2f}')
         if median_val is not None:
-            ax.axvline(median_val, color='green', linestyle='dashed', linewidth=2, label=f'Median: {median_val:.2f}')
+            self.ax.axvline(median_val, color='green', linestyle='dashed', linewidth=2, label=f'Median: {median_val:.2f}')
 
         # Plot approximated normal curve
-        xmin, xmax = ax.get_xlim()
-        x = np.linspace(xmin, xmax, num_bins)
+        xmin, xmax = self.ax.get_xlim()
+        x = np.linspace(xmin, xmax, self.bins)
         p = norm.pdf(x, mean_val, self.data.std())
-        ax.plot(x, p, 'k', linewidth=2, label='Normal Curve')
+        self.ax.plot(x, p, 'k', linewidth=2, label='Normal Curve')
 
-        ax.legend()
-        if fig is not None:
-            plt.show()
+        self.ax.legend()
 
 class CorrelationHeatmap(PlotInterface):
     """A correlation heatmap plot using seaborn."""
 
-    def __init__(self, df, columns, title='Correlation Heatmap'):
+    def __init__(self, df, columns, title='Correlation Heatmap', figsize=DEFAULT_FIGSIZE):
         """Initialize the correlation heatmap.
 
         Args:
@@ -170,34 +188,23 @@ class CorrelationHeatmap(PlotInterface):
             columns (list): List of columns to include in the correlation.
             title (str): The title of the plot.
         """
+        super().__init__(title, figsize)
         self.df = df
         self.columns = columns
-        self.title = title
 
-    def plot(self, ax = None):
-        """Plot the correlation heatmap on the given axis.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(20, 12))
-
+    def _plot(self):
+        """Plot the correlation heatmap on the given axis."""
         df_corr = self.df[self.columns].dropna()
         # Calculate the correlation matrix
         corr_matrix = df_corr.corr()
 
         # Plotting the heatmap
-        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
-        ax.set_title(self.title)
-
-        if fig is not None:
-            plt.show()
+        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", ax=self.ax)
 
 class FrequencyPie(PlotInterface):
     """A pie chart showing frequency distribution of categorical data."""
 
-    def __init__(self, data, title, labels:dict=None, figsize=(5, 4)):
+    def __init__(self, data, title, labels:dict=None, figsize=DEFAULT_FIGSIZE):
         """Initialize the frequency pie chart.
 
         Args:
@@ -206,20 +213,12 @@ class FrequencyPie(PlotInterface):
             labels (dict, optional): Mapping of values to labels.
             figsize (tuple): Size of the figure.
         """
+        super().__init__(title, figsize)
         self.data = data
-        self.title = title
         self.labels = labels
-        self.figsize = figsize
 
-    def plot(self, ax = None):
-        """Plot the pie chart on the given axis.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(figsize=self.figsize)
+    def _plot(self):
+        """Plot the pie chart on the given axis."""
 
         counts = self.data.value_counts()
         sizes = counts.values
@@ -228,16 +227,12 @@ class FrequencyPie(PlotInterface):
         else:
             labels = counts.index.astype(str)
 
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
-        ax.set_title(self.title)
-
-        if fig is not None:
-            plt.show()
+        self.ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
 
 class ScatterPlot(PlotInterface):
     """A scatter plot with mean and median horizontal lines."""
 
-    def __init__(self, x, y, title, x_label="", y_label="", x_unit="", y_unit=""):
+    def __init__(self, x, y, title, x_label="", y_label="", x_unit="", y_unit="", figsize=DEFAULT_FIGSIZE):
         """Initialize the scatter plot.
 
         Args:
@@ -248,7 +243,9 @@ class ScatterPlot(PlotInterface):
             y_label (str): Label for y-axis.
             x_unit (str): Unit for x-axis.
             y_unit (str): Unit for y-axis.
+            figsize (tuple): Size of the figure.
         """
+        super().__init__(title, figsize)
         self.x = x
         self.y = y
         self.title = title
@@ -257,33 +254,28 @@ class ScatterPlot(PlotInterface):
         self.x_unit = x_unit
         self.y_unit = y_unit
 
-    def plot(self, ax=None):
-        """Plot the scatter plot on the given axis.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(5, 4))
+    def _plot(self):
+        """Plot the scatter plot on the given axis."""
 
         median = self.y.median()
         mean = self.y.mean()
-        ax.scatter(self.x, self.y, alpha=0.5)
-        ax.axhline(y=mean, color='r', linestyle='-', label=f"Mean: {mean:.2f}")
-        ax.axhline(y=median, color='y', linestyle='--', label=f"Median: {median:.2f}")
-        ax.set_title(self.title)
-        ax.set_xlabel(f'{self.x_label} ({self.x_unit})')
-        ax.set_ylabel(f'{self.y_label} ({self.y_unit})')
-        ax.legend()
-
-        if fig is not None:
-            plt.show()
+        self.ax.scatter(self.x, self.y, alpha=0.5)
+        self.ax.axhline(y=mean, color='r', linestyle='-', label=f"Mean: {mean:.2f}")
+        self.ax.axhline(y=median, color='y', linestyle='--', label=f"Median: {median:.2f}")
+        self.ax.set_title(self.title)
+        self.ax.set_xlabel(f'{self.x_label} ({self.x_unit})')
+        self.ax.set_ylabel(f'{self.y_label} ({self.y_unit})')
+        self.ax.legend()
 
 class CrossTabBar(PlotInterface):
     """A stacked bar chart for cross-tabulated data."""
 
-    def __init__(self, x_data, y_data, title, x_label="", y_label="", x_value_labels:dict=None, y_value_labels:dict=None, legend_title=None):
+    def __init__(self, 
+                 x_data, y_data, 
+                 title, x_label="", y_label="", 
+                 x_value_labels:dict=None, y_value_labels:dict=None, 
+                 legend_title=None, figsize=DEFAULT_FIGSIZE
+        ):
         """Initialize the cross-tab bar chart.
 
         Args:
@@ -299,47 +291,38 @@ class CrossTabBar(PlotInterface):
             x_value_labels (dict, optional): Mapping for x-axis values.
             y_value_labels (dict, optional): Mapping for y-axis values.
             legend_title (str, optional): Title for the legend.
+            figsize (tuple): Size of the figure.
         """
+        super().__init__(title, figsize)
         self.x_data = x_data
         self.y_data = y_data
-        self.title = title
         self.x_label = x_label
         self.y_label = y_label
         self.x_value_labels = x_value_labels
         self.y_value_labels = y_value_labels
         self.legend_title = legend_title if legend_title else y_col
     
-    def plot(self, ax=None):
-        """Plot the stacked bar chart on the given axis.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(5, 4))
+    def _plot(self):
+        """Plot the stacked bar chart on the given axis."""
 
         crosstab = pd.crosstab(self.x_data, self.y_data, normalize='index') * 100
-        crosstab.plot(kind='bar', stacked=True, ax=ax)
-        ax.set_title(self.title)
-        ax.set_xlabel(self.x_label)
-        ax.set_ylabel(self.y_label)
-        ax.set_xticklabels([self.x_value_labels.get(val, str(val)) for val in crosstab.index], rotation=0)
-        ax.legend(title=self.legend_title, labels=[self.y_value_labels.get(val, str(val)) for val in crosstab.columns])
+        crosstab.plot(kind='bar', stacked=True, ax=self.ax)
+        self.ax.set_title(self.title)
+        self.ax.set_xlabel(self.x_label)
+        self.ax.set_ylabel(self.y_label)
+        self.ax.set_xticklabels([self.x_value_labels.get(val, str(val)) for val in crosstab.index], rotation=0)
+        self.ax.legend(title=self.legend_title, labels=[self.y_value_labels.get(val, str(val)) for val in crosstab.columns])
 
         # Add percentage labels on the bars
-        for p in ax.patches:
+        for p in self.ax.patches:
             width, height = p.get_width(), p.get_height()
             x, y = p.get_xy()
-            ax.text(x+width/2, y+height/2, f'{height:.1f}%', ha='center', va='center')
-
-        if fig is not None:
-            plt.show()
+            self.ax.text(x+width/2, y+height/2, f'{height:.1f}%', ha='center', va='center')
 
 class SplitViolin(PlotInterface):
     """A split violin plot comparing distributions of a value across two categories."""
 
-    def __init__(self, y_data, split_data, title, x_label="", y_label="", split_labels:dict=None):
+    def __init__(self, y_data, split_data, title, x_label="", y_label="", split_labels:dict=None, figsize=DEFAULT_FIGSIZE):
         """Initialize the split violin plot.
 
         Args:
@@ -349,23 +332,17 @@ class SplitViolin(PlotInterface):
             x_label (str): Label for the x-axis.
             y_label (str): Label for the y-axis.
             split_labels (dict, optional): Mapping for split categories to labels.
+            figsize (tuple): Size of the figure.
         """
+        super().__init__(title, figsize)
         self.y_data = y_data
         self.split_data = split_data
-        self.title = title
         self.x_label = x_label
         self.y_label = y_label
         self.labels = split_labels if split_labels else {}
     
-    def plot(self, ax=None):
-        """Plot the split violin plot on the given axis.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): The axis to plot on. If None, creates a new figure.
-        """
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(5, 4))
+    def _plot(self):
+        """Plot the split violin plot on the given axis."""
 
         data = pd.DataFrame({
             self.y_label: self.y_data, 
@@ -379,17 +356,14 @@ class SplitViolin(PlotInterface):
             split=True, 
             inner='box',
             hue='split',
-            ax=ax
+            ax=self.ax
         )
-        ax.set_title(self.title)
-        ax.set_xlabel(self.x_label)
-        ax.set_ylabel(self.y_label)
-        handles, labels = ax.get_legend_handles_labels()
+        self.ax.set_title(self.title)
+        self.ax.set_xlabel(self.x_label)
+        self.ax.set_ylabel(self.y_label)
+        handles, labels = self.ax.get_legend_handles_labels()
         labels = [self.labels.get(val, str(val)) for val in self.labels.keys()]
-        ax.legend(handles, labels, title=None)
-
-        if fig is not None:
-            plt.show()
+        self.ax.legend(handles, labels, title=None)
 
 class TimeSeriesPlot(PlotInterface):
     """A line plot for time series data."""
@@ -403,7 +377,7 @@ class TimeSeriesPlot(PlotInterface):
             self.linestyle = linestyle
 
 
-    def __init__(self, df, date_column, lines: List[Line], title=None):
+    def __init__(self, df, date_column, lines: List[Line], title=None, figsize=DEFAULT_FIGSIZE):
         """Initialize the time series plot.
 
         Args:
@@ -412,10 +386,10 @@ class TimeSeriesPlot(PlotInterface):
             lines (list): A list of Line objects containing the y-axis data and metadata.
             title (str): The title of the plot.
         """
+        super().__init__(title, figsize)
         self.df = df
         self.date_column = date_column
         self.lines = lines
-        self.title = title
 
     def plot(self):
         """Plot the time series line on the given axis.
