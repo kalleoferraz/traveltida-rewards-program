@@ -1,6 +1,5 @@
 
 import math
-import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -184,7 +183,7 @@ class Histogram(PlotInterface):
 class CorrelationHeatmap(PlotInterface):
     """A correlation heatmap plot using seaborn."""
 
-    def __init__(self, df, columns, title='Correlation Heatmap', figsize=DEFAULT_FIGSIZE):
+    def __init__(self, df, columns, title='Correlation Heatmap', figsize=None):
         """Initialize the correlation heatmap.
 
         Args:
@@ -192,6 +191,8 @@ class CorrelationHeatmap(PlotInterface):
             columns (list): List of columns to include in the correlation.
             title (str): The title of the plot.
         """
+        if figsize is None:
+            figsize = (len(columns)*0.5 + 1, len(columns)*0.5 + 1)  # Adjust figure size based on number of columns
         super().__init__(title, figsize)
         self.df = df
         self.columns = columns
