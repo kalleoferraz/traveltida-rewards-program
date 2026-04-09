@@ -1,5 +1,6 @@
 
 import math
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -443,7 +444,9 @@ class KDEComparisonPlot(PlotInterface):
     
     def __plot_kde(self, data, color_shape, color_mean, label):
         """Helper function to plot a KDE with mean and IQR lines."""
-        sns.kdeplot(data, fill=True, color=color_shape, ax=self.ax, label=label, alpha=self.alpha)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sns.kdeplot(data, fill=True, color=color_shape, ax=self.ax, label=label, alpha=self.alpha)
         mean_val = data.mean()
         self.ax.axvline(mean_val, color=color_mean, linestyle='-', linewidth=1.5, label=f'Mean: {mean_val:.2f}')
         # IQR lines are commented out for now to reduce clutter, but can be re-enabled if desired
